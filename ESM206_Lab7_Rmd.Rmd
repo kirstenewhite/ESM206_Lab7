@@ -1,0 +1,123 @@
+---
+title: "ESM206_Lab7"
+author: "Kirsten White"
+date: "11/8/2021"
+output: html_document
+---
+
+```{r setup, include= TRUE, warning = FALSE, message = FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+
+# --- Attach Packages ---
+library(tidyverse)
+library(broom)
+library(kableExtra)
+library(palmerpenguins)
+library(GGally)
+library(modelsummary)
+library(stargazer)
+```
+
+## Intro to ggpairs
+
+Use GGally::ggpairs() function to create a pairs plot
+- shows box plots of continuous variables, mosaic plots for categorical variables, histo for each categorical continuous variable, correlation between any 2 variables, etc
+
+```{r}
+ggpairs(penguins)
+```
+```{r}
+penguins %>%
+  select(species, bill_length_mm:body_mass_g) %>%
+  ggpairs(aes(color = species)) # creates a more manageable pairs plot
+ 
+ggplot(data = penguins, aes(x = bill_depth_mm, y = body_mass_g, group = species)) + # group by tells it to recognize difference in species, very important variable bc otherwise it sees the relationship as negatice (when its actually positive)
+  geom_point(aes(color = species)) +
+  geom_smooth(method = "lm")
+```
+
+## Multiple linear regression - penguins
+
+Use multiple linear regression to try to understand the relationship between multiple predictor variables and a single continuous outcome variable (body mass)
+
+```{r}
+penguin_lm <- lm(body_mass_g ~ flipper_length_mm + bill_depth_mm, data = penguins) #write in formula notation with predictor variables on the right) 
+
+penguin_lm
+
+summary(penguin_lm)
+```
+
+How should we interpret this coefficient for flipper_length_mm? 
+ - flipper_length_mm coefficient of 51.54 means: on average, we can expect a 1 mm increase in flipper length associated with a 51.54 gram increase in penguin body mass if everything else is constant 
+ 
+What does the adjusted r-squared value of 0.7596 mean for this scenario? 
+ - r-squared value of 0.7596 for this model means 75% of the variance in body mass can be explained by this model (consiting only of variables bill depth and flipper length)
+ 
+### Use `broom` functions tidy and glance 
+
+Use broom::tidy to get the coefficient summary in a data frame
+Use broom::glance to get the model summary in a data frame
+
+```{r}
+penguin_lm_tidy <- tidy(penguin_lm)
+penguin_lm_tidy
+```
+
+Try using in-line code to refer to the bill depth coefficint. 
+For this data frame, the bill depth estimate is 
+`r penguin_lm_tidy$estimate[3]`
+
+```{r}
+penguin_lm_glance <- glance(penguin_lm)
+penguin_lm_glance
+```
+ Instead of only using bill depth and flipper length, let's use another model that includes other variables. After doing a literature review, consulted experts, deeply explored our data and decided that the three most critical variables to include in this model are: 
+ - flipper length
+ - species
+ - sex 
+ 
+ Task: create a multiple linear regression model using these 3 variables, then take a look at the model outputs and interpret the coefficients with a neighbor
+ 
+```{r}
+penguin_mult_lm <- lm(body_mass_g ~ flipper_length_mm + species + sex, data = penguins)
+penguin_mult_lm
+```
+ 
+What do these coefficients mean? 
+- For every 1 mm increase in flipper length, we can expect a 20.02 g increase in body mass amongst penguins, on average
+
+What do the coefficients for the categorical variables mean (species, sex)?
+- Reference level is Adelie for species; female is the reference level for sex because those two variables do not show up here 
+- If all variables otherwise the same, I expect a Chinstrap penguin to have a body mass of 67.63 less than Adelie penguins on average (always in respect to reference level scenario). 
+- If all variables are otherwise the same, I expect Gentoo penguins to weigh 836.26 g more than an Adelie penguins on average (Adelie = reference level). 
+- If all variables are otherwise the same, I expect male penguins to weigh 530.38 g more than female penguins on average (female = reference level).
+
+Further, what would an equation look like for predciting a body mass of a male Adelie penguin w 200 mm long flippers? 
+body mass = 200 mm + 1 male + 0 gentoo + 0 chinstrap 
+
+### Use broom::augment() to see predicted values
+
+```{r}
+augment(penguin_mult_lm)
+```
+
+## Use plot() to look at model diagnostics
+```{r}
+plot(penguin_mult_lm)
+```
+- Conceptual understanding and expertise allows me to responsibly determine that penguin species, sex, and flipper length are reasonable predictor variable (make sure you are thinking hard about the variables and different variable combos)
+- Diagnostic plots all check out for normality of residuals, homoscedasticity, and no worrisome outliers (<< last one is not an assumption)
+
+## Make output tables 
+Using modelsummary:
+
+```{r}
+# Use model summary first 
+modelsummary(penguin_mult_lm)
+```
+Using stargazer: 
+```{r, results = "asis"}
+stargazer(penguin_mult_lm, type = "html")
+```
+
